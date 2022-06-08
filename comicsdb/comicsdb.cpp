@@ -89,53 +89,69 @@ void deleteComic(const SessionPtr &session, ComicDb &db)
 void updateComic(const SessionPtr &session, ComicDb &db)
 {
     std::size_t id{};
-    if (validId(session, db, id))
+    if (!validId(session, db, id))
+        return;
+
+    auto &request = session->get_request();
+    std::size_t length{};
+    length = request->get_header("Content-Length", length);
+    if (length == 0)
     {
-        auto &request = session->get_request();
-        if (request->get_body().empty())
-        {
-            notAcceptable(session, "Not Acceptable, empty body");
-            return;
-        }
-
-        const std::string json =
-            reinterpret_cast<const char *>(request->get_body().data());
-        Comic comic = fromJson(json);
-        if (comic.title.empty() || comic.issue < 1 || comic.writer.empty() ||
-            comic.penciler.empty() || comic.inker.empty() ||
-            comic.letterer.empty() || comic.colorist.empty())
-        {
-            notAcceptable(session, "Not Acceptable, invalid JSON");
-            return;
-        }
-
-        db[id] = comic;
-        session->close(restbed::OK);
+        notAcceptable(session, "Not Acceptable, empty request body");
+        return;
     }
+
+    session->fetch(
+        length,
+        [&db, id](const SessionPtr &session, const restbed::Bytes &data)
+        {
+            const std::string json{reinterpret_cast<const char *>(data.data()),
+                                   data.size()};
+            Comic comic = fromJson(json);
+            if (comic.title.empty() || comic.issue < 1 ||
+                comic.writer.empty() || comic.penciler.empty() ||
+                comic.inker.empty() || comic.letterer.empty() ||
+                comic.colorist.empty())
+            {
+                notAcceptable(session, "Not Acceptable, invalid JSON");
+                return;
+            }
+
+            db[id] = comic;
+            session->close(restbed::OK);
+        });
 }
 
 void createComic(const SessionPtr &session, ComicDb &db)
 {
     auto &request = session->get_request();
-    if (request->get_body().empty())
+    std::size_t length{};
+    length = request->get_header("Content-Length", length);
+    if (length == 0)
     {
         notAcceptable(session, "Not Acceptable, empty body");
         return;
     }
 
-    const std::string json =
-        reinterpret_cast<const char *>(request->get_body().data());
-    Comic comic = fromJson(json);
-    if (comic.title.empty() || comic.issue < 1 || comic.writer.empty() ||
-        comic.penciler.empty() || comic.inker.empty() ||
-        comic.letterer.empty() || comic.colorist.empty())
-    {
-        notAcceptable(session, "Not Acceptable, invalid JSON");
-        return;
-    }
+    session->fetch(
+        length,
+        [&db](const SessionPtr &session, const restbed::Bytes &data)
+        {
+            const std::string json{reinterpret_cast<const char *>(data.data()),
+                                   data.size()};
+            Comic comic = fromJson(json);
+            if (comic.title.empty() || comic.issue < 1 ||
+                comic.writer.empty() || comic.penciler.empty() ||
+                comic.inker.empty() || comic.letterer.empty() ||
+                comic.colorist.empty())
+            {
+                notAcceptable(session, "Not Acceptable, invalid JSON");
+                return;
+            }
 
-    db.push_back(comic);
-    session->close(restbed::OK);
+            db.push_back(comic);
+            session->close(restbed::OK);
+        });
 }
 
 void publishResources(restbed::Service &service, ComicDb &db)
@@ -152,9 +168,10 @@ void publishResources(restbed::Service &service, ComicDb &db)
 
     auto createComicResource = std::make_shared<restbed::Resource>();
     createComicResource->set_path("/comic");
-    createComicResource->set_method_handler(
-        "PUT",
-        [&db](const SessionPtr &session) { return createComic(session, db); });
+    auto createComicCallback = [&db](const SessionPtr &session)
+    { return createComic(session, db); };
+    createComicResource->set_method_handler("PUT", createComicCallback);
+    createComicResource->set_method_handler("POST", createComicCallback);
     service.publish(createComicResource);
 }
 
