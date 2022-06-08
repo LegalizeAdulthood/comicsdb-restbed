@@ -3,7 +3,8 @@
 #include <iostream>
 #include <vector>
 
-int main() {
+int main()
+{
   std::vector<comicsdb::Comic> db;
   db.emplace_back(comicsdb::fromJson(
       R"json({"title":"The Fantastic Four","issue":1,"writer":"Stan Lee","penciler":"Jack Kirby","inker":"George Klein","letterer":"Artie Simek","colorist":"Stan Goldberg"})json"));

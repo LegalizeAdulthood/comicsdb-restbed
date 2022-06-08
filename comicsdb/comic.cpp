@@ -6,12 +6,15 @@
 
 #include <restbed>
 
-namespace comicsdb {
+namespace comicsdb
+{
 
-std::string toJson(const Comic &comic) {
+std::string toJson(const Comic &comic)
+{
   rapidjson::Document doc;
   rapidjson::Value &obj = doc.SetObject();
-  auto addMember = [&obj, &doc](const char *key, const std::string &value) {
+  auto addMember = [&obj, &doc](const char *key, const std::string &value)
+  {
     using String = rapidjson::GenericStringRef<char>;
     obj.AddMember(String{key}, String{value.c_str()}, doc.GetAllocator());
   };
@@ -28,19 +31,20 @@ std::string toJson(const Comic &comic) {
   return buffer.GetString();
 }
 
-Comic fromJson( const std::string& json )
+Comic fromJson(const std::string &json)
 {
-    rapidjson::Document doc;
-    doc.Parse(json.c_str());
-    Comic comic{};
-    auto getString = [&doc](const char *key) { return doc[key].GetString(); };
-    comic.title = getString("title");
-    comic.issue = doc["issue"].GetInt();
-    comic.writer = getString("writer");
-    comic.penciler = getString("penciler");
-    comic.inker = getString("inker");
-    comic.letterer = getString("letterer");
-    comic.colorist = getString("colorist");
-    return comic;
+  rapidjson::Document doc;
+  doc.Parse(json.c_str());
+  Comic comic{};
+  auto getString = [&doc](const char *key) { return doc[key].GetString(); };
+  comic.title = getString("title");
+  comic.issue = doc["issue"].GetInt();
+  comic.writer = getString("writer");
+  comic.penciler = getString("penciler");
+  comic.inker = getString("inker");
+  comic.letterer = getString("letterer");
+  comic.colorist = getString("colorist");
+  return comic;
 }
+
 } // namespace comicsdb
