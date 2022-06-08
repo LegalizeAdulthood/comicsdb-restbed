@@ -38,61 +38,78 @@ std::shared_ptr<restbed::Settings> getSettings()
     return settings;
 }
 
-void readComic(const SessionPtr &session, const ComicDb &db)
+void notAcceptable(const SessionPtr &session, const std::string &msg)
+{
+    session->close(restbed::NOT_ACCEPTABLE, msg,
+                   {{"Content-Type", "text/plain"},
+                    {"Content-Length", std::to_string(msg.size())}});
+}
+
+bool validId(const SessionPtr &session, const ComicDb &db, size_t &id)
 {
     const auto &request = session->get_request();
     if (request->has_path_parameter("id"))
     {
-        const std::size_t id = request->get_path_parameter("id", 0);
+        id = request->get_path_parameter("id", 0);
         if (id < db.size() && db[id].issue != Comic::DELETED_ISSUE)
         {
-            const std::string json = toJson(db[id]);
-            session->close(restbed::OK, json,
-                           {{"Content-Type", "application/json"},
-                            {"Content-Length", std::to_string(json.size())}});
+            return true;
         }
-        else
-        {
-            const std::string msg{"Not Acceptable, id out of range"};
-            session->close(restbed::NOT_ACCEPTABLE, msg,
-                           {{"Content-Type", "text/plain"},
-                            {"Content-Length", std::to_string(msg.size())}});
-        }
+        notAcceptable(session, "Not Acceptable, id out of range");
     }
     else
     {
-        const std::string msg{"Not Acceptable, missing id"};
-        session->close(restbed::NOT_ACCEPTABLE, msg,
-                       {{"Content-Type", "text/plain"},
-                        {"Content-Length", std::to_string(msg.size())}});
+        notAcceptable(session, "Not Acceptable, missing id");
+    }
+    return false;
+}
+
+void readComic(const SessionPtr &session, const ComicDb &db)
+{
+    size_t id{};
+    if (validId(session, db, id))
+    {
+        const std::string json = toJson(db[id]);
+        session->close(restbed::OK, json,
+                       {{"Content-Type", "application/json"},
+                        {"Content-Length", std::to_string(json.size())}});
     }
 }
 
 void deleteComic(const SessionPtr &session, ComicDb &db)
 {
-    const auto &request = session->get_request();
-    if (request->has_path_parameter("id"))
+    size_t id{};
+    if (validId(session, db, id))
     {
-        const std::size_t id = request->get_path_parameter("id", 0);
-        if (id < db.size())
-        {
-            db[id] = Comic{};
-            session->close(restbed::OK);
-        }
-        else
-        {
-            const std::string msg{"Not Acceptable, id out of range"};
-            session->close(restbed::NOT_ACCEPTABLE, msg,
-                           {{"Content-Length", std::to_string(msg.size())},
-                            {"Content-Type", "text/plain"}});
-        }
+        db[id] = Comic{};
+        session->close(restbed::OK);
     }
-    else
+}
+
+void updateComic(const SessionPtr &session, ComicDb &db)
+{
+    size_t id{};
+    if (validId(session, db, id))
     {
-        const std::string msg{"Not Acceptable, missing id"};
-        session->close(restbed::NOT_ACCEPTABLE, msg,
-                       {{"Content-Length", std::to_string(msg.size())},
-                        {"Content-Type", "text/plain"}});
+        auto &request = session->get_request();
+        if (request->get_body().empty())
+        {
+            notAcceptable(session, "Not Acceptable, empty body");
+            return;
+        }
+
+        const std::string json = reinterpret_cast<const char *>(
+            session->get_request()->get_body().data());
+        Comic comic = fromJson(json);
+        if (comic.title.empty() || comic.issue < 1 || comic.writer.empty() ||
+            comic.penciler.empty() || comic.inker.empty() ||
+            comic.letterer.empty() || comic.colorist.empty())
+        {
+            notAcceptable(session, "Not Acceptable, invalid JSON");
+            return;
+        }
+
+        db[id] = comic;
     }
 }
 
@@ -104,7 +121,8 @@ void publishResources(restbed::Service &service, ComicDb &db)
                                       { return readComic(session, db); });
     comicResource->set_method_handler("DELETE", [&db](const SessionPtr &session)
                                       { return deleteComic(session, db); });
-
+    comicResource->set_method_handler("PUT", [&db](const SessionPtr &session)
+                                      { return updateComic(session, db); });
     service.publish(comicResource);
 }
 
