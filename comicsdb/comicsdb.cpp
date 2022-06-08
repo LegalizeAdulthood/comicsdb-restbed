@@ -45,7 +45,7 @@ void notAcceptable(const SessionPtr &session, const std::string &msg)
                     {"Content-Length", std::to_string(msg.size())}});
 }
 
-bool validId(const SessionPtr &session, const ComicDb &db, size_t &id)
+bool validId(const SessionPtr &session, const ComicDb &db, std::size_t &id)
 {
     const auto &request = session->get_request();
     if (request->has_path_parameter("id"))
@@ -66,7 +66,7 @@ bool validId(const SessionPtr &session, const ComicDb &db, size_t &id)
 
 void readComic(const SessionPtr &session, const ComicDb &db)
 {
-    size_t id{};
+    std::size_t id{};
     if (validId(session, db, id))
     {
         const std::string json = toJson(db[id]);
@@ -78,7 +78,7 @@ void readComic(const SessionPtr &session, const ComicDb &db)
 
 void deleteComic(const SessionPtr &session, ComicDb &db)
 {
-    size_t id{};
+    std::size_t id{};
     if (validId(session, db, id))
     {
         db[id] = Comic{};
@@ -88,7 +88,7 @@ void deleteComic(const SessionPtr &session, ComicDb &db)
 
 void updateComic(const SessionPtr &session, ComicDb &db)
 {
-    size_t id{};
+    std::size_t id{};
     if (validId(session, db, id))
     {
         auto &request = session->get_request();
@@ -98,8 +98,8 @@ void updateComic(const SessionPtr &session, ComicDb &db)
             return;
         }
 
-        const std::string json = reinterpret_cast<const char *>(
-            session->get_request()->get_body().data());
+        const std::string json =
+            reinterpret_cast<const char *>(request->get_body().data());
         Comic comic = fromJson(json);
         if (comic.title.empty() || comic.issue < 1 || comic.writer.empty() ||
             comic.penciler.empty() || comic.inker.empty() ||
@@ -110,7 +110,32 @@ void updateComic(const SessionPtr &session, ComicDb &db)
         }
 
         db[id] = comic;
+        session->close(restbed::OK);
     }
+}
+
+void createComic(const SessionPtr &session, ComicDb &db)
+{
+    auto &request = session->get_request();
+    if (request->get_body().empty())
+    {
+        notAcceptable(session, "Not Acceptable, empty body");
+        return;
+    }
+
+    const std::string json =
+        reinterpret_cast<const char *>(request->get_body().data());
+    Comic comic = fromJson(json);
+    if (comic.title.empty() || comic.issue < 1 || comic.writer.empty() ||
+        comic.penciler.empty() || comic.inker.empty() ||
+        comic.letterer.empty() || comic.colorist.empty())
+    {
+        notAcceptable(session, "Not Acceptable, invalid JSON");
+        return;
+    }
+
+    db.push_back(comic);
+    session->close(restbed::OK);
 }
 
 void publishResources(restbed::Service &service, ComicDb &db)
@@ -124,6 +149,13 @@ void publishResources(restbed::Service &service, ComicDb &db)
     comicResource->set_method_handler("PUT", [&db](const SessionPtr &session)
                                       { return updateComic(session, db); });
     service.publish(comicResource);
+
+    auto createComicResource = std::make_shared<restbed::Resource>();
+    createComicResource->set_path("/comic");
+    createComicResource->set_method_handler(
+        "PUT",
+        [&db](const SessionPtr &session) { return createComic(session, db); });
+    service.publish(createComicResource);
 }
 
 void runService()
