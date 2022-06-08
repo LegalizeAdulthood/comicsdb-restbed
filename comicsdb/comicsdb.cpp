@@ -41,19 +41,29 @@ void publishResources(restbed::Service &service, std::vector<comicsdb::Comic> &d
         [&db](const std::shared_ptr<restbed::Session> &session)
         {
           const auto &request = session->get_request();
-          const std::size_t id = request->get_path_parameter("id", 0);
-          if (id < db.size())
+          if (request->has_path_parameter("id"))
           {
-            const std::string json = toJson(db[id]);
-            session->close(restbed::OK, json,
-                           {{"Content-Length", std::to_string(json.size())}});
+            const std::size_t id = request->get_path_parameter("id", 0);
+            if (id < db.size())
+            {
+              const std::string json = toJson(db[id]);
+              session->close(restbed::OK, json,
+                             {{"Content-Length", std::to_string(json.size())}});
+            }
+            else
+            {
+              const std::string msg{"Not Acceptable, id out of range"};
+              session->close(restbed::NOT_ACCEPTABLE, msg,
+                             {{"Content-Length", std::to_string(msg.size())},
+                              {"Content-Type", "text/plain"}});
+            }
           }
           else
           {
-            const std::string msg{"Not Acceptable, id out of range"};
-            session->close(restbed::NOT_ACCEPTABLE, msg,
-                           {{"Content-Length", std::to_string(msg.size())},
-                            {"Content-Type", "text/plain"}});
+              const std::string msg{"Not Acceptable, missing id"};
+              session->close(restbed::NOT_ACCEPTABLE, msg,
+                             {{"Content-Length", std::to_string(msg.size())},
+                              {"Content-Type", "text/plain"}});
           }
         });
 
