@@ -12,6 +12,37 @@ namespace comicsdb
 using ComicDb = std::vector<Comic>;
 using SessionPtr = std::shared_ptr<restbed::Session>;
 
+class CustomLogger : public restbed::Logger
+{
+  public:
+    void stop() override {}
+
+    void start(const std::shared_ptr<const restbed::Settings> &) override {}
+
+    void log(const Level, const char *format, ...) override
+    {
+        std::va_list arguments;
+        va_start(arguments, format);
+
+        vfprintf(stderr, format, arguments);
+        fprintf(stderr, "\n");
+
+        va_end(arguments);
+    }
+
+    void log_if(bool expression, const Level level, const char *format,
+                ...) override
+    {
+        if (expression)
+        {
+            std::va_list arguments;
+            va_start(arguments, format);
+            log(level, format, arguments);
+            va_end(arguments);
+        }
+    }
+};
+
 ComicDb load()
 {
     ComicDb db;
@@ -181,6 +212,7 @@ void runService()
 
     restbed::Service service;
     publishResources(service, db);
+    service.set_logger(std::make_shared<CustomLogger>());
     service.start(getSettings());
 }
 
