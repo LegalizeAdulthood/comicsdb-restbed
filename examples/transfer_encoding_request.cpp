@@ -9,6 +9,8 @@
 using namespace std;
 using namespace restbed;
 
+void read_chunk( const shared_ptr< Session > session, const Bytes& data );
+
 void read_chunk_size( const shared_ptr< Session > session, const Bytes& data )
 {
     if ( not data.empty( ) )
