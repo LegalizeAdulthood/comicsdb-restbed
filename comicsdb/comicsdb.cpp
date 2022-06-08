@@ -3,12 +3,14 @@
 #include <restbed>
 
 #include <iostream>
+#include <mutex>
 #include <string>
 #include <vector>
 
 namespace comicsdb
 {
 
+std::mutex g_dbMutex;
 using ComicDb = std::vector<Comic>;
 using SessionPtr = std::shared_ptr<restbed::Session>;
 
@@ -112,7 +114,10 @@ void deleteComic(const SessionPtr &session, ComicDb &db)
     std::size_t id{};
     if (validId(session, db, id))
     {
-        db[id] = Comic{};
+        {
+            std::unique_lock<std::mutex> lock(g_dbMutex);
+            db[id] = Comic{};
+        }
         session->close(restbed::OK);
     }
 }
@@ -148,7 +153,10 @@ void updateComic(const SessionPtr &session, ComicDb &db)
                 return;
             }
 
-            db[id] = comic;
+            {
+                std::unique_lock<std::mutex> lock(g_dbMutex);
+                db[id] = comic;
+            }
             session->close(restbed::OK);
         });
 }
@@ -180,7 +188,10 @@ void createComic(const SessionPtr &session, ComicDb &db)
                 return;
             }
 
-            db.push_back(comic);
+            {
+                std::unique_lock<std::mutex> lock(g_dbMutex);
+                db.push_back(comic);
+            }
             session->close(restbed::OK);
         });
 }
