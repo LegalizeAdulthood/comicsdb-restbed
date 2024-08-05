@@ -6,3 +6,7 @@ of comic books.  The REST API is implemented using [Corvusoft's restbed library]
 # Video Presentation
 
 This code was created for use in a [Utah C++ Programmers](https://www.meetup.com/utah-cpp-programmers/) presentation on [Adding a REST API with Corvusoft's restbed](https://www.youtube.com/watch?v=qpDBXakSXk4).
+
+[Utah C++ Programmers](https://meetup.com/utah-cpp-programmers)\
+[Past Topics](https://utahcpp.wordpress.com/past-meeting-topics/)\
+[Future Topics](https://utahcpp.wordpress.com/future-meeting-topics/)
